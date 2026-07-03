@@ -1,0 +1,39 @@
+import os
+from typing import Any
+
+from dotenv import load_dotenv
+from neo4j import GraphDatabase
+
+
+class Neo4jClient:
+    """Small wrapper around the official Neo4j driver."""
+
+    def __init__(self) -> None:
+        load_dotenv()
+
+        uri = os.getenv("NEO4J_URI", "bolt://localhost:7687")
+        user = os.getenv("NEO4J_USER", "neo4j")
+        password = os.getenv("NEO4J_PASSWORD")
+
+        if not password:
+            raise ValueError("NEO4J_PASSWORD is not set. Copy .env.example to .env and fill it.")
+
+        self.driver = GraphDatabase.driver(uri, auth=(user, password))
+
+    def write(self, query: str, parameters: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+        with self.driver.session() as session:
+            result = session.execute_write(self._run, query, parameters or {})
+            return result
+
+    def read(self, query: str, parameters: dict[str, Any] | None = None) -> list[dict[str, Any]]:
+        with self.driver.session() as session:
+            result = session.execute_read(self._run, query, parameters or {})
+            return result
+
+    def close(self) -> None:
+        self.driver.close()
+
+    @staticmethod
+    def _run(tx, query: str, parameters: dict[str, Any]) -> list[dict[str, Any]]:
+        result = tx.run(query, parameters)
+        return [{key: record[key] for key in record.keys()} for record in result]

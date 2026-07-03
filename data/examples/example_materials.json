@@ -1,0 +1,128 @@
+{
+  "sources": [
+    {
+      "id": "pub_1997",
+      "name": "Публикация A о веществе ББ",
+      "year": 1997,
+      "title": "Experiment A: material BB under condition X"
+    },
+    {
+      "id": "pub_2011",
+      "name": "Публикация B о веществе Б",
+      "year": 2011,
+      "title": "Experiment B: material B under condition X"
+    }
+  ],
+  "entities": [
+    {
+      "id": "exp_a_1997",
+      "type": "Experiment",
+      "name": "Эксперимент A 1997"
+    },
+    {
+      "id": "exp_b_2011",
+      "type": "Experiment",
+      "name": "Эксперимент B 2011"
+    },
+    {
+      "id": "mat_b",
+      "type": "Material",
+      "name": "вещество Б",
+      "aliases": ["Б"]
+    },
+    {
+      "id": "mat_bb",
+      "type": "Material",
+      "name": "вещество ББ",
+      "aliases": ["ББ"]
+    },
+    {
+      "id": "proc_regime_work",
+      "type": "Process",
+      "name": "работа в режимах X/Y"
+    },
+    {
+      "id": "param_x",
+      "type": "Parameter",
+      "name": "режим X",
+      "aliases": ["X"]
+    },
+    {
+      "id": "param_y",
+      "type": "Parameter",
+      "name": "режим Y",
+      "aliases": ["Y"]
+    },
+    {
+      "id": "prop_q",
+      "type": "Property",
+      "name": "свойство Q",
+      "aliases": ["Q"]
+    }
+  ],
+  "relations": [
+    {
+      "source": "exp_a_1997",
+      "type": "USES_MATERIAL",
+      "target": "mat_bb"
+    },
+    {
+      "source": "exp_a_1997",
+      "type": "OPERATES_AT_CONDITION",
+      "target": "param_x"
+    },
+    {
+      "source": "exp_a_1997",
+      "type": "PRODUCES_OUTPUT",
+      "target": "prop_q",
+      "effect": "increases"
+    },
+    {
+      "source": "exp_a_1997",
+      "type": "DESCRIBED_IN",
+      "target": "pub_1997"
+    },
+    {
+      "source": "exp_b_2011",
+      "type": "USES_MATERIAL",
+      "target": "mat_b"
+    },
+    {
+      "source": "exp_b_2011",
+      "type": "OPERATES_AT_CONDITION",
+      "target": "param_x"
+    },
+    {
+      "source": "exp_b_2011",
+      "type": "PRODUCES_OUTPUT",
+      "target": "prop_q",
+      "effect": "decreases"
+    },
+    {
+      "source": "exp_b_2011",
+      "type": "DESCRIBED_IN",
+      "target": "pub_2011"
+    },
+    {
+      "source": "proc_regime_work",
+      "type": "USES_MATERIAL",
+      "target": "mat_b"
+    },
+    {
+      "source": "proc_regime_work",
+      "type": "USES_MATERIAL",
+      "target": "mat_bb"
+    }
+  ],
+  "hypotheses": [
+    {
+      "source": "mat_b",
+      "target": "mat_bb",
+      "type": "HYPOTHESIZED_RELATED_TO",
+      "reason": "Оба вещества связаны со свойством Q при режиме X, но эффект разный",
+      "based_on": ["pub_1997", "pub_2011"],
+      "confidence": 0.62
+    }
+  ]
+}
+

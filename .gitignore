@@ -13,6 +13,12 @@ __pycache__/
 
 data/uploads/*
 !data/uploads/.gitkeep
+data/raw/
+data/private/
+
+neo4j/data/
+neo4j/logs/
+*.dump
 
 design-assets/
 
