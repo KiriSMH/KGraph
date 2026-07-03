@@ -97,9 +97,30 @@ streamlit run app.py
 
 Точки замены изолированы в сервисном слое:
 
-- JSON graph → Neo4j в `graph_service.py`;
+- JSON graph → Neo4j в `graph_service.py` через модуль `kg/`;
 - keyword search → Qdrant/Chroma в `search_service.py` и `vector_service.py`;
 - mock agent → LLM agent через `llm_service.py`;
 - mock data → реальные документы хакатона через `data_service.py` или ingestion pipeline.
 
 Контракты API и Streamlit-интерфейс при этих заменах можно сохранить.
+
+## Интеграция с Neo4j-модулем
+
+В проект добавлен модуль `kg/` для работы с Neo4j. Backend уже умеет пробовать брать подграф из Neo4j через этот модуль:
+
+```text
+POST /graph
+POST /chat
+  -> backend/app/services/graph_service.py
+  -> kg/neo4j_client.py
+  -> kg/queries.py
+```
+
+Если Neo4j не настроен, нет пароля или база недоступна, backend автоматически возвращается к mock-графу из `data/graph.json`, поэтому демо продолжает работать.
+
+Чтобы включить Neo4j:
+
+1. Скопировать `.env.example` в `.env`.
+2. Заполнить `NEO4J_PASSWORD`.
+3. Установить зависимости из `backend/requirements.txt`.
+4. Импортировать данные в Neo4j через скрипты из `scripts/`.
