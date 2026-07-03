@@ -1,0 +1,162 @@
+<!doctype html>
+<html lang="ru">
+  <head>
+    <meta charset="UTF-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>Научный клубок</title>
+    <link rel="stylesheet" href="./styles.css?v=5" />
+  </head>
+  <body>
+    <div class="app-shell">
+      <aside class="sidebar">
+        <div class="sidebar-top">
+          <div class="sidebar-heading">
+            <h1>Источники</h1>
+            <button class="ghost-icon" type="button" aria-label="Свернуть">‹</button>
+          </div>
+
+          <label class="upload-box" for="fileInput">
+            <input id="fileInput" type="file" multiple />
+            <span class="upload-plus" aria-hidden="true"></span>
+            <span class="upload-text">Добавить источники</span>
+          </label>
+
+          <div class="sources-card" id="sourcesCard">
+            <div class="empty-file-icon" aria-hidden="true">
+              <span class="file-square"></span>
+              <span class="file-plus"></span>
+            </div>
+            <p>Загрузите свои источники или используйте mock-данные демо.</p>
+          </div>
+        </div>
+
+        <div class="demo-block">
+          <h2>Демо-запросы</h2>
+          <button class="demo-query active" type="button">
+            Что известно про Ti-6Al-4V после закалки?
+          </button>
+          <button class="demo-query" type="button">
+            Какие режимы повышали прочность алюминиевых сплавов?
+          </button>
+          <button class="demo-query" type="button">
+            Что делали для повышения коррозионной стойкости?
+          </button>
+          <button class="demo-query" type="button">
+            Где есть пробелы по лазерной обработке?
+          </button>
+          <button class="demo-query" type="button">
+            Какие эксперименты связаны с Inconel 718?
+          </button>
+        </div>
+      </aside>
+
+      <main class="workspace">
+        <section class="hero" id="hero">
+          <div class="hero-copy">
+            <div class="knot-logo" aria-hidden="true">
+              <svg viewBox="0 0 120 96" fill="none">
+                <line x1="30" y1="28" x2="60" y2="12" />
+                <line x1="60" y1="12" x2="90" y2="28" />
+                <line x1="90" y1="28" x2="90" y2="62" />
+                <line x1="90" y1="62" x2="60" y2="80" />
+                <line x1="60" y1="80" x2="30" y2="62" />
+                <line x1="30" y1="62" x2="30" y2="28" />
+                <line x1="30" y1="62" x2="60" y2="12" />
+                <line x1="60" y1="12" x2="90" y2="62" />
+                <line x1="30" y1="28" x2="90" y2="62" />
+                <circle cx="30" cy="28" r="5.8" />
+                <circle cx="60" cy="12" r="5.8" />
+                <circle cx="90" cy="28" r="5.8" />
+                <circle cx="90" cy="62" r="5.8" />
+                <circle cx="60" cy="80" r="5.8" />
+                <circle cx="30" cy="62" r="5.8" />
+              </svg>
+            </div>
+            <p class="eyebrow">AI-система для материаловедения</p>
+            <h2>Введите запрос<br />для исследования</h2>
+            <p class="subtitle">
+              Найдите связи между материалами, экспериментами, свойствами и
+              технологическими режимами.
+            </p>
+          </div>
+
+          <form class="search-form" id="searchForm">
+            <input
+              id="queryInput"
+              type="text"
+              value="Что известно про Ti-6Al-4V после закалки?"
+              autocomplete="off"
+            />
+            <button type="submit" aria-label="Найти связи">
+              <svg viewBox="0 0 24 24" fill="none">
+                <circle cx="10.5" cy="10.5" r="6.5"></circle>
+                <path d="M15.5 15.5L21 21"></path>
+              </svg>
+            </button>
+          </form>
+
+          <div class="status-line" id="statusLine"></div>
+        </section>
+
+        <section class="results hidden" id="results">
+          <div class="results-header">
+            <div>
+              <p class="eyebrow">Результат анализа</p>
+              <h2>Связи найдены</h2>
+            </div>
+            <form class="compact-search" id="compactSearchForm">
+              <input id="compactQueryInput" type="text" autocomplete="off" />
+              <button type="submit">Обновить</button>
+            </form>
+          </div>
+
+          <div class="result-grid">
+            <section class="answer-panel">
+              <div class="panel-title">
+                <span>Чат с ИИ</span>
+                <span class="panel-mark">agent.py</span>
+              </div>
+              <div class="answer-card">
+                <div class="bubble ai" id="answerText"></div>
+                <div class="bubble user" id="userQuestion"></div>
+              </div>
+
+              <div class="follow-card">
+                <h3>Уточняющие вопросы</h3>
+                <ul id="followQuestions"></ul>
+              </div>
+            </section>
+
+            <section class="graph-panel">
+              <div class="panel-title">
+                <span>Граф связей</span>
+                <span class="panel-mark" id="graphStats">0 узлов</span>
+              </div>
+              <div class="graph-stage" id="graphStage"></div>
+            </section>
+          </div>
+
+          <div class="bottom-grid">
+            <section class="content-panel">
+              <div class="panel-title">
+                <span>Связанные документы</span>
+                <span class="panel-mark" id="docsCount">0</span>
+              </div>
+              <div class="cards-list" id="documentsList"></div>
+            </section>
+
+            <section class="content-panel">
+              <div class="panel-title">
+                <span>Потенциальные гипотезы и пробелы</span>
+                <span class="panel-mark" id="hypothesesCount">0</span>
+              </div>
+              <div class="cards-list" id="hypothesesList"></div>
+            </section>
+          </div>
+        </section>
+      </main>
+    </div>
+
+    <script src="./app.js?v=5"></script>
+  </body>
+</html>
