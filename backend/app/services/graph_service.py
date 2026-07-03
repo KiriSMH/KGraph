@@ -1,12 +1,18 @@
+import os
 import re
+import socket
 import sys
 from pathlib import Path
 from typing import Any
+from urllib.parse import urlparse
 
 from app.services.data_service import load_graph
+from dotenv import load_dotenv
 
 
-PROJECT_ROOT = Path(__file__).resolve().parents[3]
+REPO_ROOT = Path(__file__).resolve().parents[3]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 
 def _matches_query(node: dict[str, Any], query: str) -> bool:
@@ -17,14 +23,6 @@ def _matches_query(node: dict[str, Any], query: str) -> bool:
         term in searchable or str(node.get("label", "")).casefold() in normalized_query
         for term in terms
     )
-
-
-def get_subgraph(query: str) -> dict[str, list[dict[str, Any]]]:
-    """Return a graph for the UI, preferring Neo4j and falling back to mock JSON."""
-    neo4j_graph = _get_neo4j_subgraph(query)
-    if neo4j_graph["nodes"]:
-        return neo4j_graph
-    return _get_mock_subgraph(query)
 
 
 def _get_mock_subgraph(query: str) -> dict[str, list[dict[str, Any]]]:
@@ -50,32 +48,68 @@ def _get_mock_subgraph(query: str) -> dict[str, list[dict[str, Any]]]:
     return {"nodes": related_nodes, "edges": related_edges}
 
 
-def _get_neo4j_subgraph(query: str) -> dict[str, list[dict[str, Any]]]:
-    try:
-        if str(PROJECT_ROOT) not in sys.path:
-            sys.path.insert(0, str(PROJECT_ROOT))
+def _node_type(labels: list[str], properties: dict[str, Any]) -> str:
+    if properties.get("type"):
+        return str(properties["type"])
+    for label in labels:
+        if label != "Entity":
+            return label
+    return "Entity"
 
-        from kg.neo4j_client import Neo4jClient
-        from kg.queries import get_subgraph as get_kg_subgraph
 
-        client = Neo4jClient()
-    except Exception:
-        return {"nodes": [], "edges": []}
+def _adapt_neo4j_subgraph(subgraph: dict[str, list[dict[str, Any]]]) -> dict[str, list[dict[str, Any]]]:
+    nodes: list[dict[str, Any]] = []
+    element_to_uid: dict[str, str] = {}
 
-    try:
-        entity_name = _find_neo4j_entity_name(client, query)
-        if not entity_name:
-            return {"nodes": [], "edges": []}
+    for node in subgraph.get("nodes", []):
+        properties = node.get("properties", {})
+        uid = node.get("uid") or properties.get("uid") or node.get("id") or properties.get("id")
+        if not uid:
+            continue
 
-        graph = get_kg_subgraph(client, entity_name)
-        return _adapt_neo4j_graph(graph)
-    except Exception:
-        return {"nodes": [], "edges": []}
-    finally:
-        try:
-            client.close()
-        except Exception:
-            pass
+        element_id = node.get("element_id")
+        if element_id:
+            element_to_uid[str(element_id)] = str(uid)
+
+        nodes.append(
+            {
+                "id": str(uid),
+                "label": str(properties.get("name") or properties.get("canonical_name") or uid),
+                "type": _node_type(node.get("labels", []), properties),
+            }
+        )
+
+    edges: list[dict[str, Any]] = []
+    known_node_ids = {node["id"] for node in nodes}
+    for relationship in subgraph.get("relationships", []):
+        source = (
+            relationship.get("start_node_uid")
+            or relationship.get("source_uid")
+            or element_to_uid.get(str(relationship.get("start_node")))
+        )
+        target = (
+            relationship.get("end_node_uid")
+            or relationship.get("target_uid")
+            or element_to_uid.get(str(relationship.get("end_node")))
+        )
+        if not source or not target:
+            continue
+
+        source = str(source)
+        target = str(target)
+        if source not in known_node_ids or target not in known_node_ids:
+            continue
+
+        properties = relationship.get("properties", {})
+        edges.append(
+            {
+                "source": source,
+                "target": target,
+                "label": str(properties.get("effect") or relationship.get("type") or "RELATED_TO"),
+            }
+        )
+
+    return {"nodes": nodes, "edges": edges}
 
 
 def _find_neo4j_entity_name(client: Any, query: str) -> str | None:
@@ -105,61 +139,45 @@ def _find_neo4j_entity_name(client: Any, query: str) -> str | None:
     return rows[0].get("entity_name")
 
 
-def _adapt_neo4j_graph(graph: dict[str, list[dict[str, Any]]]) -> dict[str, list[dict[str, Any]]]:
-    raw_nodes = graph.get("nodes", [])
-    raw_relationships = graph.get("relationships", [])
-    element_id_to_node_id: dict[str, str] = {}
-    nodes: list[dict[str, Any]] = []
+def _is_neo4j_reachable() -> bool:
+    load_dotenv()
+    load_dotenv(REPO_ROOT / ".env")
 
-    for node in raw_nodes:
-        properties = node.get("properties", {})
-        node_id = str(
-            node.get("uid")
-            or properties.get("uid")
-            or node.get("id")
-            or properties.get("id")
-            or node.get("element_id")
-        )
-        label = str(
-            properties.get("name")
-            or properties.get("label")
-            or properties.get("canonical_name")
-            or properties.get("id")
-            or node_id
-        )
-        node_type = str(properties.get("type") or _first_domain_label(node.get("labels", [])))
+    uri = os.getenv("NEO4J_URI", "bolt://localhost:7687")
+    parsed = urlparse(uri)
+    host = parsed.hostname or "localhost"
+    port = parsed.port or 7687
 
-        if node.get("element_id"):
-            element_id_to_node_id[str(node["element_id"])] = node_id
-
-        nodes.append({"id": node_id, "label": label, "type": node_type})
-
-    edges: list[dict[str, Any]] = []
-    for relationship in raw_relationships:
-        source = (
-            relationship.get("source_uid")
-            or element_id_to_node_id.get(str(relationship.get("start_node")))
-        )
-        target = (
-            relationship.get("target_uid")
-            or element_id_to_node_id.get(str(relationship.get("end_node")))
-        )
-        if not source or not target:
-            continue
-
-        edges.append(
-            {
-                "source": str(source),
-                "target": str(target),
-                "label": str(relationship.get("type", "RELATED_TO")),
-            }
-        )
-
-    return {"nodes": nodes, "edges": edges}
+    try:
+        with socket.create_connection((host, port), timeout=0.25):
+            return True
+    except OSError:
+        return False
 
 
-def _first_domain_label(labels: list[str]) -> str:
-    for label in labels:
-        if label != "Entity":
-            return label
-    return "Entity"
+def _get_neo4j_subgraph(query: str) -> dict[str, list[dict[str, Any]]]:
+    if not _is_neo4j_reachable():
+        raise ConnectionError("Neo4j is not reachable")
+
+    from kg.neo4j_client import Neo4jClient
+    from kg.queries import get_subgraph as get_kg_subgraph
+
+    client = Neo4jClient()
+    try:
+        entity_name = _find_neo4j_entity_name(client, query) or query
+        subgraph = get_kg_subgraph(client, entity_name)
+    finally:
+        client.close()
+
+    adapted = _adapt_neo4j_subgraph(subgraph)
+    if not adapted["nodes"]:
+        raise ValueError(f"Neo4j has no entity for query: {query}")
+    return adapted
+
+
+def get_subgraph(query: str) -> dict[str, list[dict[str, Any]]]:
+    """Read from Neo4j first and fall back to local mock graph data."""
+    try:
+        return _get_neo4j_subgraph(query)
+    except Exception:
+        return _get_mock_subgraph(query)

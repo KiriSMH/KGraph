@@ -30,6 +30,10 @@ RETURN path;
 MATCH path = (m:Entity {canonical_name: "material_bb"})-[*1..2]-(n)
 RETURN path;
 
+// 7a. Show frontend/backend demo subgraph around Ti-6Al-4V.
+MATCH path = (m:Entity {canonical_name: "ti-6al-4v"})-[*1..2]-(n)
+RETURN path;
+
 // 8. Check that HYPOTHESIZED_RELATED_TO has visual_style="dashed".
 MATCH (a)-[r:HYPOTHESIZED_RELATED_TO]->(b)
 RETURN a.name AS source, type(r) AS relationship_type, b.name AS target, r.evidence_type AS evidence_type, r.visual_style AS visual_style;

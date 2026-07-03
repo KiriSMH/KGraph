@@ -77,5 +77,7 @@ def _serialize_relationship(relationship: Any) -> dict[str, Any]:
         "end_node": relationship.end_node.element_id,
         "source_uid": relationship.start_node.get("uid"),
         "target_uid": relationship.end_node.get("uid"),
+        "start_node_uid": dict(relationship.start_node).get("uid"),
+        "end_node_uid": dict(relationship.end_node).get("uid"),
         "properties": dict(relationship),
     }
