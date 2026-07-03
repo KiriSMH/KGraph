@@ -50,6 +50,7 @@ python scripts/import_json.py data/examples/example_materials.json
 python scripts/demo_get_subgraph.py "вещество Б"
 python scripts/demo_get_subgraph.py "Б"
 python scripts/demo_get_subgraph.py "вещество ББ"
+python scripts/demo_get_subgraph.py "Ti-6Al-4V"
 ```
 
 Факты хранятся как обычные ребра с `evidence_type="fact"` и `visual_style="solid"`.
@@ -64,3 +65,19 @@ python scripts/demo_get_subgraph.py "вещество ББ"
 ```
 
 Готовые проверки для Neo4j Browser лежат в `cypher/demo_queries.cypher`.
+
+Готовый query для backend/frontend demo:
+
+```text
+Ti-6Al-4V
+```
+
+Проверка backend endpoint:
+
+```bash
+curl -X POST http://127.0.0.1:18080/graph \
+  -H "Content-Type: application/json" \
+  -d '{"query":"Ti-6Al-4V"}'
+```
+
+Если Neo4j доступен и demo JSON импортирован, backend вернет `nodes` и `edges` из Neo4j. Если Neo4j недоступен или сущность не найдена, backend автоматически вернет mock graph из `data/graph.json`.

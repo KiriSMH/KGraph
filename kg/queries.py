@@ -61,6 +61,7 @@ def get_hypotheses(client: Neo4jClient, limit: int = 50) -> dict[str, list[dict[
 def _serialize_node(node: Any) -> dict[str, Any]:
     properties = dict(node)
     return {
+        "element_id": node.element_id,
         "uid": properties.get("uid"),
         "id": properties.get("id"),
         "labels": list(node.labels),
@@ -74,5 +75,7 @@ def _serialize_relationship(relationship: Any) -> dict[str, Any]:
         "type": relationship.type,
         "start_node": relationship.start_node.element_id,
         "end_node": relationship.end_node.element_id,
+        "start_node_uid": dict(relationship.start_node).get("uid"),
+        "end_node_uid": dict(relationship.end_node).get("uid"),
         "properties": dict(relationship),
     }

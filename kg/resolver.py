@@ -62,6 +62,16 @@ SYNONYMS = {
     "y": "condition_y",
     "condition y": "condition_y",
     "condition_y": "condition_y",
+    "ti-6al-4v": "ti-6al-4v",
+    "ti 6al 4v": "ti-6al-4v",
+    "ti64": "ti-6al-4v",
+    "титан ti-6al-4v": "ti-6al-4v",
+    "прочность": "strength",
+    "strength": "strength",
+    "пластичность": "ductility",
+    "ductility": "ductility",
+    "закалка": "quenching",
+    "quenching": "quenching",
 }
 
 DEDUP_BY_CANONICAL_NAME = {

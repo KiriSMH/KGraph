@@ -1,4 +1,5 @@
 import os
+from pathlib import Path
 from typing import Any
 
 from dotenv import load_dotenv
@@ -10,6 +11,7 @@ class Neo4jClient:
 
     def __init__(self) -> None:
         load_dotenv()
+        load_dotenv(Path(__file__).resolve().parents[1] / ".env")
 
         uri = os.getenv("NEO4J_URI", "bolt://localhost:7687")
         user = os.getenv("NEO4J_USER", "neo4j")

@@ -1,7 +1,14 @@
 import re
+import sys
+from pathlib import Path
 from typing import Any
 
 from app.services.data_service import load_graph
+
+
+REPO_ROOT = Path(__file__).resolve().parents[3]
+if str(REPO_ROOT) not in sys.path:
+    sys.path.insert(0, str(REPO_ROOT))
 
 
 def _matches_query(node: dict[str, Any], query: str) -> bool:
@@ -14,8 +21,7 @@ def _matches_query(node: dict[str, Any], query: str) -> bool:
     )
 
 
-def get_subgraph(query: str) -> dict[str, list[dict[str, Any]]]:
-    """Read a local subgraph. Replace this JSON traversal with a Neo4j query later."""
+def _get_mock_subgraph(query: str) -> dict[str, list[dict[str, Any]]]:
     graph = load_graph()
     nodes = graph.get("nodes", [])
     edges = graph.get("edges", [])
@@ -36,3 +42,83 @@ def get_subgraph(query: str) -> dict[str, list[dict[str, Any]]]:
     }
     related_nodes = [node for node in nodes if node.get("id") in related_ids]
     return {"nodes": related_nodes, "edges": related_edges}
+
+
+def _node_type(labels: list[str], properties: dict[str, Any]) -> str:
+    if properties.get("type"):
+        return str(properties["type"])
+    for label in labels:
+        if label != "Entity":
+            return label
+    return "Entity"
+
+
+def _adapt_neo4j_subgraph(subgraph: dict[str, list[dict[str, Any]]]) -> dict[str, list[dict[str, Any]]]:
+    nodes = []
+    element_to_uid = {}
+
+    for node in subgraph.get("nodes", []):
+        properties = node.get("properties", {})
+        uid = node.get("uid") or properties.get("uid") or node.get("id") or properties.get("id")
+        if not uid:
+            continue
+
+        element_id = node.get("element_id")
+        if element_id:
+            element_to_uid[element_id] = uid
+
+        nodes.append(
+            {
+                "id": str(uid),
+                "label": str(properties.get("name") or properties.get("canonical_name") or uid),
+                "type": _node_type(node.get("labels", []), properties),
+            }
+        )
+
+    edges = []
+    known_node_ids = {node["id"] for node in nodes}
+    for relationship in subgraph.get("relationships", []):
+        source = relationship.get("start_node_uid") or element_to_uid.get(relationship.get("start_node"))
+        target = relationship.get("end_node_uid") or element_to_uid.get(relationship.get("end_node"))
+        if not source or not target:
+            continue
+
+        source = str(source)
+        target = str(target)
+        if source not in known_node_ids or target not in known_node_ids:
+            continue
+
+        properties = relationship.get("properties", {})
+        edges.append(
+            {
+                "source": source,
+                "target": target,
+                "label": str(properties.get("effect") or relationship.get("type") or "RELATED_TO"),
+            }
+        )
+
+    return {"nodes": nodes, "edges": edges}
+
+
+def _get_neo4j_subgraph(query: str) -> dict[str, list[dict[str, Any]]]:
+    from kg.neo4j_client import Neo4jClient
+    from kg.queries import get_subgraph as get_kg_subgraph
+
+    client = Neo4jClient()
+    try:
+        subgraph = get_kg_subgraph(client, query)
+    finally:
+        client.close()
+
+    adapted = _adapt_neo4j_subgraph(subgraph)
+    if not adapted["nodes"]:
+        raise ValueError(f"Neo4j has no entity for query: {query}")
+    return adapted
+
+
+def get_subgraph(query: str) -> dict[str, list[dict[str, Any]]]:
+    """Read from Neo4j first and fall back to local mock graph data."""
+    try:
+        return _get_neo4j_subgraph(query)
+    except Exception:
+        return _get_mock_subgraph(query)

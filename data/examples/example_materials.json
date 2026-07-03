@@ -11,6 +11,12 @@
       "name": "Публикация B о веществе Б",
       "year": 2011,
       "title": "Experiment B: material B under condition X"
+    },
+    {
+      "id": "pub_ti64_2024",
+      "name": "Публикация о закалке Ti-6Al-4V",
+      "year": 2024,
+      "title": "Quenching effect on Ti-6Al-4V strength"
     }
   ],
   "entities": [
@@ -25,6 +31,11 @@
       "name": "Эксперимент B 2011"
     },
     {
+      "id": "exp_ti64_quench",
+      "type": "Experiment",
+      "name": "Закалка Ti-6Al-4V от 950 C"
+    },
+    {
       "id": "mat_b",
       "type": "Material",
       "name": "вещество Б",
@@ -37,9 +48,21 @@
       "aliases": ["ББ"]
     },
     {
+      "id": "mat_ti64",
+      "type": "Material",
+      "name": "Ti-6Al-4V",
+      "aliases": ["Ti64", "титан Ti-6Al-4V"]
+    },
+    {
       "id": "proc_regime_work",
       "type": "Process",
       "name": "работа в режимах X/Y"
+    },
+    {
+      "id": "proc_quenching",
+      "type": "Process",
+      "name": "закалка",
+      "aliases": ["quenching"]
     },
     {
       "id": "param_x",
@@ -54,10 +77,29 @@
       "aliases": ["Y"]
     },
     {
+      "id": "param_950c",
+      "type": "Parameter",
+      "name": "температура 950 C",
+      "value": 950,
+      "unit": "C"
+    },
+    {
       "id": "prop_q",
       "type": "Property",
       "name": "свойство Q",
       "aliases": ["Q"]
+    },
+    {
+      "id": "prop_strength",
+      "type": "Property",
+      "name": "прочность",
+      "aliases": ["strength"]
+    },
+    {
+      "id": "prop_ductility",
+      "type": "Property",
+      "name": "пластичность",
+      "aliases": ["ductility"]
     }
   ],
   "relations": [
@@ -112,6 +154,38 @@
       "source": "proc_regime_work",
       "type": "USES_MATERIAL",
       "target": "mat_bb"
+    },
+    {
+      "source": "exp_ti64_quench",
+      "type": "USES_MATERIAL",
+      "target": "mat_ti64"
+    },
+    {
+      "source": "exp_ti64_quench",
+      "type": "OPERATES_AT_CONDITION",
+      "target": "param_950c"
+    },
+    {
+      "source": "exp_ti64_quench",
+      "type": "PRODUCES_OUTPUT",
+      "target": "prop_strength",
+      "effect": "increases"
+    },
+    {
+      "source": "exp_ti64_quench",
+      "type": "PRODUCES_OUTPUT",
+      "target": "prop_ductility",
+      "effect": "decreases"
+    },
+    {
+      "source": "exp_ti64_quench",
+      "type": "DESCRIBED_IN",
+      "target": "pub_ti64_2024"
+    },
+    {
+      "source": "proc_quenching",
+      "type": "USES_MATERIAL",
+      "target": "mat_ti64"
     }
   ],
   "hypotheses": [
@@ -125,4 +199,3 @@
     }
   ]
 }
-
