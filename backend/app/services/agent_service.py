@@ -2,6 +2,7 @@ from typing import Any
 
 from app.services.data_service import load_hypotheses
 from app.services.graph_service import get_subgraph
+from app.services.llm_service import generate_llm_answer
 from app.services.search_service import search_documents
 
 
@@ -28,6 +29,11 @@ def generate_agent_response(query: str) -> dict[str, Any]:
     documents = search_documents(query)
     graph = get_subgraph(query)
     hypotheses = _select_hypotheses(query)
+    llm_context = {
+        "documents": documents,
+        "graph": graph,
+        "hypotheses": hypotheses,
+    }
 
     materials = sorted({value for doc in documents for value in doc.get("materials", [])})
     processes = sorted({value for doc in documents for value in doc.get("processes", [])})
@@ -47,6 +53,10 @@ def generate_agent_response(query: str) -> dict[str, Any]:
             "Точных документов по запросу не найдено. Показаны обзорный фрагмент графа "
             "и ближайшие гипотезы, которые помогут уточнить направление поиска."
         )
+
+    llm_answer = generate_llm_answer(query, llm_context)
+    if llm_answer:
+        answer = llm_answer
 
     return {
         "answer": answer,

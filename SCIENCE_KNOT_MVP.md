@@ -124,3 +124,22 @@ POST /chat
 2. Заполнить `NEO4J_PASSWORD`.
 3. Установить зависимости из `backend/requirements.txt`.
 4. Импортировать данные в Neo4j через скрипты из `scripts/`.
+
+## Подключение YandexGPT
+
+Backend умеет использовать YandexGPT через Yandex AI Studio. Если ключи не заданы или API недоступен, система автоматически использует mock-ответ агента.
+
+Чтобы включить YandexGPT:
+
+1. Скопировать `.env.example` в `.env`.
+2. Заполнить:
+
+```text
+YANDEX_API_KEY=...
+YANDEX_FOLDER_ID=...
+YANDEX_GPT_MODEL=yandexgpt-lite
+```
+
+3. Перезапустить backend.
+
+После этого `POST /chat` будет собирать контекст из документов, графа и гипотез, а текст ответа будет формироваться через YandexGPT.
