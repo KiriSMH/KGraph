@@ -152,12 +152,12 @@ YANDEX_GPT_MODEL=yandexgpt-lite
 PDF/TXT/DOCX/JSON
   -> извлечение текста
   -> chunk_text()
-  -> embeddings через OpenAI
+  -> embeddings через Yandex Foundation Models
   -> Qdrant in-memory
   -> semantic_search()
 ```
 
-Если `OPENAI_API_KEY`, `openai` или `qdrant-client` недоступны, backend не падает: включается локальный fallback-поиск по чанкам. Поэтому демо продолжает работать даже без embeddings.
+Если `YANDEX_API_KEY`, `YANDEX_FOLDER_ID` или `qdrant-client` недоступны, backend не падает: включается локальный fallback-поиск по чанкам. Поэтому демо продолжает работать даже без embeddings.
 
 Чтобы включить настоящий semantic search:
 
@@ -165,8 +165,10 @@ PDF/TXT/DOCX/JSON
 2. Добавить в `.env`:
 
 ```text
-OPENAI_API_KEY=...
-OPENAI_EMBEDDING_MODEL=text-embedding-3-small
+YANDEX_API_KEY=...
+YANDEX_FOLDER_ID=...
+YANDEX_EMBEDDING_DOC_MODEL=text-search-doc/latest
+YANDEX_EMBEDDING_QUERY_MODEL=text-search-query/latest
 ```
 
 3. Перезапустить backend.

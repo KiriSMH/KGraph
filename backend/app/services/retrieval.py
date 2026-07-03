@@ -3,6 +3,8 @@ from __future__ import annotations
 import json
 import os
 import re
+import urllib.error
+import urllib.request
 from pathlib import Path
 from typing import Any
 
@@ -14,6 +16,9 @@ except ImportError:  # pragma: no cover - fallback for partially installed envs
 
 
 UPLOAD_DIR = Path(__file__).resolve().parents[3] / "data" / "uploads"
+YANDEX_EMBEDDING_URL = "https://llm.api.cloud.yandex.net/foundationModels/v1/textEmbedding"
+DEFAULT_YANDEX_DOC_EMBEDDING_MODEL = "text-search-doc/latest"
+DEFAULT_YANDEX_QUERY_EMBEDDING_MODEL = "text-search-query/latest"
 
 KNOWN_MATERIALS = ["Ti-6Al-4V", "Al-6061", "Inconel 718", "Steel 09G2S", "09G2S"]
 KNOWN_PROCESSES = ["закалка", "отжиг", "лазерная обработка", "прокатка"]
@@ -36,18 +41,22 @@ def chunk_text(text: str, chunk_size: int = 600, overlap: int = 150) -> list[str
 
 
 class RetrievalIndex:
-    """In-memory retrieval layer: OpenAI embeddings + Qdrant, with local fallback."""
+    """In-memory retrieval layer: Yandex embeddings + Qdrant, with local fallback."""
 
     def __init__(self) -> None:
         self.collection_name = "scientific_papers"
-        self.embedding_model = "text-embedding-3-small"
-        self.vector_size = 1536
+        self.doc_embedding_model = DEFAULT_YANDEX_DOC_EMBEDDING_MODEL
+        self.query_embedding_model = DEFAULT_YANDEX_QUERY_EMBEDDING_MODEL
+        self.vector_size = 0
         self._client: Any | None = None
+        self._distance: Any | None = None
+        self._vector_params: Any | None = None
         self._point_struct: Any | None = None
         self._next_point_id = 1
         self._chunks: list[dict[str, Any]] = []
         self._indexed_files: dict[str, tuple[float, int]] = {}
         self._vector_ready = False
+        self._collection_ready = False
         self._vector_error: str | None = None
         self._uploads_scanned = False
 
@@ -92,7 +101,7 @@ class RetrievalIndex:
             self._chunks.append(metadata)
 
             if vector_client:
-                vector = self._get_embedding(chunk)
+                vector = self._get_embedding(chunk, purpose="document")
                 if vector is None:
                     vector_client = None
                     continue
@@ -112,7 +121,7 @@ class RetrievalIndex:
         return {
             "status": "indexed_local",
             "chunks": len(chunks),
-            "message": "Embeddings недоступны, включён локальный поиск по чанкам.",
+            "message": "Yandex embeddings недоступны, включён локальный поиск по чанкам.",
         }
 
     def semantic_search(self, query: str, top_k: int = 5) -> list[dict[str, Any]]:
@@ -123,7 +132,7 @@ class RetrievalIndex:
             return []
 
         if self._ensure_vector_client():
-            vector = self._get_embedding(normalized_query)
+            vector = self._get_embedding(normalized_query, purpose="query")
             if vector is not None:
                 results = self._search_vectors(vector, top_k)
                 if results:
@@ -137,20 +146,14 @@ class RetrievalIndex:
             "vector_ready": self._vector_ready,
             "vector_error": self._vector_error,
             "collection": self.collection_name,
+            "provider": "yandex",
         }
 
     def _ensure_vector_client(self) -> bool:
-        if self._vector_ready and self._client is not None:
+        if self._client is not None:
             return True
-        if self._vector_error:
-            return False
 
         load_dotenv()
-        api_key = os.getenv("OPENAI_API_KEY")
-        self.embedding_model = os.getenv("OPENAI_EMBEDDING_MODEL", self.embedding_model)
-        if not api_key:
-            self._vector_error = "OPENAI_API_KEY не задан."
-            return False
 
         try:
             from qdrant_client import QdrantClient
@@ -161,46 +164,75 @@ class RetrievalIndex:
 
         try:
             self._client = QdrantClient(":memory:")
+            self._distance = Distance
+            self._vector_params = VectorParams
             self._point_struct = PointStruct
-            self._client.recreate_collection(
-                collection_name=self.collection_name,
-                vectors_config=VectorParams(size=self.vector_size, distance=Distance.COSINE),
-            )
         except Exception as exc:  # pragma: no cover - depends on optional Qdrant runtime
             self._vector_error = f"Qdrant недоступен: {exc}"
             self._client = None
             return False
 
-        self._vector_ready = True
         return True
 
-    def _get_embedding(self, text: str) -> list[float] | None:
+    def _get_embedding(self, text: str, purpose: str) -> list[float] | None:
         load_dotenv()
-        api_key = os.getenv("OPENAI_API_KEY")
-        if not api_key:
+        api_key = os.getenv("YANDEX_API_KEY")
+        folder_id = os.getenv("YANDEX_FOLDER_ID")
+        if not api_key or not folder_id:
+            self._vector_error = "YANDEX_API_KEY или YANDEX_FOLDER_ID не заданы."
+            return None
+
+        self.doc_embedding_model = os.getenv(
+            "YANDEX_EMBEDDING_DOC_MODEL",
+            self.doc_embedding_model,
+        )
+        self.query_embedding_model = os.getenv(
+            "YANDEX_EMBEDDING_QUERY_MODEL",
+            self.query_embedding_model,
+        )
+        model_name = self.query_embedding_model if purpose == "query" else self.doc_embedding_model
+        model_uri = _build_yandex_embedding_model_uri(folder_id, model_name)
+
+        payload = {
+            "modelUri": model_uri,
+            "text": text,
+        }
+        request = urllib.request.Request(
+            YANDEX_EMBEDDING_URL,
+            data=json.dumps(payload, ensure_ascii=False).encode("utf-8"),
+            headers={
+                "Authorization": f"Api-Key {api_key}",
+                "Content-Type": "application/json",
+                "x-folder-id": folder_id,
+            },
+            method="POST",
+        )
+
+        try:
+            with urllib.request.urlopen(request, timeout=20) as response:
+                data = json.loads(response.read().decode("utf-8"))
+        except urllib.error.HTTPError as exc:
+            self._vector_error = f"Yandex embeddings вернули HTTP {exc.code}."
+            return None
+        except (urllib.error.URLError, TimeoutError, json.JSONDecodeError) as exc:
+            self._vector_error = f"Yandex embeddings недоступны: {exc}"
+            return None
+
+        embedding = data.get("embedding") or data.get("result", {}).get("embedding")
+        if not isinstance(embedding, list) or not embedding:
+            self._vector_error = "Yandex embeddings вернули пустой вектор."
             return None
 
         try:
-            from openai import OpenAI
-
-            client = OpenAI(api_key=api_key)
-            response = client.embeddings.create(model=self.embedding_model, input=text)
-            return list(response.data[0].embedding)
-        except Exception:
-            pass
-
-        try:
-            import openai
-
-            openai.api_key = api_key
-            response = openai.Embedding.create(input=[text], model=self.embedding_model)
-            return list(response["data"][0]["embedding"])
-        except Exception as exc:
-            self._vector_error = f"OpenAI embeddings недоступны: {exc}"
+            return [float(value) for value in embedding]
+        except (TypeError, ValueError):
+            self._vector_error = "Yandex embeddings вернули некорректный вектор."
             return None
 
     def _upsert_vector(self, metadata: dict[str, Any], vector: list[float]) -> None:
         if self._client is None or self._point_struct is None:
+            return
+        if not self._ensure_collection(len(vector)):
             return
 
         point_id = self._next_point_id
@@ -209,6 +241,32 @@ class RetrievalIndex:
 
         point = self._point_struct(id=point_id, vector=vector, payload=metadata)
         self._client.upsert(collection_name=self.collection_name, points=[point])
+
+    def _ensure_collection(self, vector_size: int) -> bool:
+        if self._client is None or self._distance is None or self._vector_params is None:
+            return False
+
+        if self._collection_ready:
+            if vector_size != self.vector_size:
+                self._vector_error = (
+                    f"Размерность Yandex embeddings изменилась: {self.vector_size} -> {vector_size}."
+                )
+                return False
+            return True
+
+        try:
+            self._client.recreate_collection(
+                collection_name=self.collection_name,
+                vectors_config=self._vector_params(size=vector_size, distance=self._distance.COSINE),
+            )
+        except Exception as exc:
+            self._vector_error = f"Не удалось создать Qdrant collection: {exc}"
+            return False
+
+        self.vector_size = vector_size
+        self._collection_ready = True
+        self._vector_ready = True
+        return True
 
     def _search_vectors(self, vector: list[float], top_k: int) -> list[dict[str, Any]]:
         if self._client is None:
@@ -347,6 +405,12 @@ def _extract_known_terms(text: str) -> tuple[list[str], list[str], list[str]]:
     properties = [item for item in KNOWN_PROPERTIES if item.casefold() in normalized]
     properties = ["твёрдость" if item == "твердость" else item for item in properties]
     return _unique(materials), _unique(processes), _unique(properties)
+
+
+def _build_yandex_embedding_model_uri(folder_id: str, model_name: str) -> str:
+    if model_name.startswith("emb://"):
+        return model_name
+    return f"emb://{folder_id}/{model_name}"
 
 
 def _unique(values: list[str]) -> list[str]:

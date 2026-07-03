@@ -1,6 +1,5 @@
 neo4j
 python-dotenv
-openai
 qdrant-client
 pypdf
 python-docx
