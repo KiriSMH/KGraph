@@ -121,7 +121,7 @@ function setLoading(isLoading) {
 }
 
 function renderResult(query, data) {
-  answerText.textContent = data.answer || "Ответ пока не сформирован.";
+  answerText.innerHTML = renderMarkdown(data.answer || "Ответ пока не сформирован.");
   userQuestion.textContent = query;
 
   renderFollowQuestions(data.follow_up_questions || []);
@@ -310,6 +310,34 @@ function getNodeColor(type) {
     Equipment: "#c9b993",
   };
   return colors[type] || "#d9d9d9";
+}
+
+function renderMarkdown(value) {
+  const escaped = escapeHtml(value);
+  const blocks = escaped
+    .split(/\n{2,}/)
+    .map((block) => block.trim())
+    .filter(Boolean);
+
+  if (!blocks.length) {
+    return "";
+  }
+
+  return blocks
+    .map((block) => {
+      const lines = block.split(/\n/).map((line) => line.trim()).filter(Boolean);
+      if (lines.length && lines.every((line) => /^[-*]\s+/.test(line))) {
+        return `<ul>${lines
+          .map((line) => `<li>${formatInlineMarkdown(line.replace(/^[-*]\s+/, ""))}</li>`)
+          .join("")}</ul>`;
+      }
+      return `<p>${formatInlineMarkdown(lines.join("<br>"))}</p>`;
+    })
+    .join("");
+}
+
+function formatInlineMarkdown(value) {
+  return value.replace(/\*\*(.+?)\*\*/g, "<strong>$1</strong>");
 }
 
 function escapeHtml(value) {
