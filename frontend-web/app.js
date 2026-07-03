@@ -52,7 +52,16 @@ fileInput.addEventListener("change", async () => {
       }
 
       const data = await response.json();
-      uploaded.push({ file, status: "Загружен", size: data.size });
+      const chunks = Number(data.indexed_chunks || 0);
+      const indexMessage = data.index_message || "";
+      uploaded.push({
+        file,
+        status: chunks
+          ? `Загружен и проиндексирован (${chunks} чанков)`
+          : "Загружен, но текстовый индекс не создан",
+        detail: indexMessage,
+        size: data.size,
+      });
     } catch (error) {
       uploaded.push({ file, status: `Ошибка: ${error.message}` });
     }
@@ -131,7 +140,7 @@ function renderResult(query, data) {
 }
 
 function renderUploadList(items) {
-  const readyCount = items.filter((item) => item.status === "Загружен").length;
+  const readyCount = items.filter((item) => item.status.startsWith("Загружен")).length;
   sourcesCard.innerHTML = `
     <div class="source-list">
       <div class="source-list-title">
@@ -140,7 +149,7 @@ function renderUploadList(items) {
       </div>
       ${items
         .map((item) => {
-          const isReady = item.status === "Загружен";
+          const isReady = item.status.startsWith("Загружен");
           const isError = item.status.startsWith("Ошибка");
           const statusClass = isReady ? "ready" : isError ? "error" : "pending";
           return `
@@ -149,6 +158,7 @@ function renderUploadList(items) {
               <span>
                 ${escapeHtml(item.file.name)}
                 <small>${escapeHtml(item.status)}</small>
+                ${item.detail ? `<small>${escapeHtml(item.detail)}</small>` : ""}
               </span>
             </div>
           `;

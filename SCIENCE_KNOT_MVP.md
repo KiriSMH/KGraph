@@ -16,10 +16,10 @@ FastAPI endpoints
     |
     +-- agent_service   — собирает единый ответ
     +-- agent           — стабильный контракт agent.chat()
-    +-- search_service  — keyword search по документам
+    +-- search_service  — semantic search по загрузкам + keyword search по mock-документам
     +-- graph_service   — извлечение подграфа
     +-- data_service    — безопасное чтение JSON
-    +-- vector_service  — заглушка Qdrant/Chroma
+    +-- vector_service  — retrieval.py-интеграция: PDF/TXT/DOCX/JSON -> chunks -> embeddings/Qdrant
     +-- llm_service     — заглушка LLM
     |
     v
@@ -85,7 +85,7 @@ streamlit run app.py
 
 - `GET /health` и `GET /documents`;
 - `POST /upload` для сохранения пользовательских файлов в `data/uploads/`;
-- `POST /search` с простым ранжированием;
+- `POST /search` с поиском по загруженным файлам и mock-документам;
 - `POST /graph` с выборкой связанных узлов и рёбер;
 - `POST /hypotheses` с фильтрацией по материалу или свойству;
 - `POST /chat`, объединяющий ответ, документы, граф и гипотезы;
@@ -143,3 +143,33 @@ YANDEX_GPT_MODEL=yandexgpt-lite
 3. Перезапустить backend.
 
 После этого `POST /chat` будет собирать контекст из документов, графа и гипотез, а текст ответа будет формироваться через YandexGPT.
+
+## Интеграция NLP / retrieval
+
+В `backend/app/services/retrieval.py` добавлена адаптация NLP-модуля участника:
+
+```text
+PDF/TXT/DOCX/JSON
+  -> извлечение текста
+  -> chunk_text()
+  -> embeddings через OpenAI
+  -> Qdrant in-memory
+  -> semantic_search()
+```
+
+Если `OPENAI_API_KEY`, `openai` или `qdrant-client` недоступны, backend не падает: включается локальный fallback-поиск по чанкам. Поэтому демо продолжает работать даже без embeddings.
+
+Чтобы включить настоящий semantic search:
+
+1. Установить зависимости из `backend/requirements.txt`.
+2. Добавить в `.env`:
+
+```text
+OPENAI_API_KEY=...
+OPENAI_EMBEDDING_MODEL=text-embedding-3-small
+```
+
+3. Перезапустить backend.
+4. Загрузить PDF/TXT/DOCX/JSON на сайте через блок «Источники».
+
+После загрузки `/chat` и `/search` будут учитывать текст загруженных файлов.
