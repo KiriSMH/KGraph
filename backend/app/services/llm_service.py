@@ -19,9 +19,14 @@ def generate_llm_answer(query: str, context: dict[str, Any]) -> str | None:
     """Generate an answer with YandexGPT if credentials are configured."""
     load_dotenv()
 
+    provider = os.getenv("LLM_PROVIDER", "auto").strip().casefold()
+    if provider in {"mock", "offline", "none", "disabled"}:
+        return None
+
     api_key = os.getenv("YANDEX_API_KEY")
     folder_id = os.getenv("YANDEX_FOLDER_ID")
     model_name = os.getenv("YANDEX_GPT_MODEL", "yandexgpt-lite")
+    timeout = float(os.getenv("YANDEX_TIMEOUT_SECONDS", "6"))
 
     if not api_key or not folder_id:
         return None
@@ -51,7 +56,7 @@ def generate_llm_answer(query: str, context: dict[str, Any]) -> str | None:
     )
 
     try:
-        with urllib.request.urlopen(request, timeout=20) as response:
+        with urllib.request.urlopen(request, timeout=timeout) as response:
             data = json.loads(response.read().decode("utf-8"))
     except (urllib.error.URLError, urllib.error.HTTPError, TimeoutError, json.JSONDecodeError):
         return None

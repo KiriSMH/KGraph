@@ -20,7 +20,7 @@ FastAPI endpoints
     +-- graph_service   — извлечение подграфа
     +-- data_service    — безопасное чтение JSON
     +-- vector_service  — retrieval.py-интеграция: PDF/TXT/DOCX/JSON -> chunks -> embeddings/Qdrant
-    +-- llm_service     — заглушка LLM
+    +-- llm_service     — optional YandexGPT adapter с offline fallback
     |
     v
 data/*.json
@@ -92,6 +92,7 @@ streamlit run app.py
 - web frontend с поиском, реальной отправкой файлов в backend, чатом, графом, документами и гипотезами;
 - Streamlit-интерфейс как запасной вариант;
 - безопасная обработка отсутствующих и некорректных JSON-файлов.
+- offline-agent с аналитическим ответом, если внешний LLM недоступен.
 
 ## Будущие интеграции
 
@@ -175,3 +176,24 @@ YANDEX_EMBEDDING_QUERY_MODEL=text-search-query/latest
 4. Загрузить PDF/TXT/DOCX/JSON на сайте через блок «Источники».
 
 После загрузки `/chat` и `/search` будут учитывать текст загруженных файлов.
+
+## Demo-safe режим
+
+Если внешние API заблокированы, в `.env` можно указать:
+
+```text
+LLM_PROVIDER=mock
+```
+
+В этом режиме backend не обращается к YandexGPT и сразу использует offline-agent. Приложение всё равно показывает ответ, документы, граф, гипотезы и уточняющие вопросы.
+
+## Схема отношений
+
+Для Knowledge Graph используем такие типы связей:
+
+- `USES_MATERIAL`: `Process -> Material`;
+- `OPERATES_AT_CONDITION`: `Process -> Property`, `Equipment -> Property`;
+- `PRODUCES_OUTPUT`: `Process -> Material`;
+- `DESCRIBED_IN`: `Experiment | Process | Material | Property | Equipment | Expert | Facility -> Publication`;
+- `VALIDATED_BY`: `Property | Process | Material -> Experiment | Expert`;
+- `CONTRADICTS`: только при совпадении материала, режима, условий и свойства.
