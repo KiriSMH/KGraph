@@ -228,8 +228,8 @@ function renderHypotheses(hypotheses) {
 }
 
 function renderGraph(graph) {
-  const nodes = (graph.nodes || []).slice(0, 12);
-  const edges = (graph.edges || []).slice(0, 18);
+  const nodes = (graph.nodes || []).slice(0, 14);
+  const edges = (graph.edges || []).slice(0, 22);
   graphStats.textContent = `${nodes.length} узлов / ${edges.length} связей`;
 
   if (!nodes.length) {
@@ -237,76 +237,196 @@ function renderGraph(graph) {
     return;
   }
 
-  const width = 920;
-  const height = 580;
+  const width = 1080;
+  const height = 680;
   const centerX = width / 2;
   const centerY = height / 2;
-  const radiusX = 340;
-  const radiusY = 210;
+  const radiusX = 410;
+  const radiusY = 255;
   const positions = {};
+  const sortedNodes = sortGraphNodes(nodes, edges);
 
-  nodes.forEach((node, index) => {
-    const angle = (2 * Math.PI * index) / nodes.length - Math.PI / 2;
+  sortedNodes.forEach((node, index) => {
+    if (index === 0) {
+      positions[node.id] = { x: centerX, y: centerY };
+      return;
+    }
+
+    const ringIndex = index - 1;
+    const ringCount = sortedNodes.length - 1;
+    const angle = (2 * Math.PI * ringIndex) / Math.max(ringCount, 1) - Math.PI / 2;
+    const stagger = ringIndex % 2 === 0 ? 1 : 0.88;
     positions[node.id] = {
-      x: centerX + Math.cos(angle) * radiusX,
-      y: centerY + Math.sin(angle) * radiusY,
+      x: centerX + Math.cos(angle) * radiusX * stagger,
+      y: centerY + Math.sin(angle) * radiusY * stagger,
     };
   });
 
   const lines = edges
     .filter((edge) => positions[edge.source] && positions[edge.target])
-    .map((edge) => {
+    .map((edge, index) => {
       const source = positions[edge.source];
       const target = positions[edge.target];
+      const labelX = (source.x + target.x) / 2;
+      const labelY = (source.y + target.y) / 2;
+      const label = String(edge.label || "связь").slice(0, 24);
       return `
-        <line
-          x1="${source.x}"
-          y1="${source.y}"
-          x2="${target.x}"
-          y2="${target.y}"
-          stroke="rgba(43,33,17,0.16)"
-          stroke-width="2"
-        />
-      `;
-    })
-    .join("");
-
-  const circles = nodes
-    .map((node) => {
-      const position = positions[node.id];
-      const color = getNodeColor(node.type);
-      const textColor = color === "#2f4a52" || color === "#5b74ff" ? "#ffffff" : "#2b2111";
-      const label = String(node.label || node.id || "").slice(0, 22);
-
-      return `
-        <g>
-          <circle
-            cx="${position.x}"
-            cy="${position.y}"
-            r="56"
-            fill="${color}"
-            stroke="#f7f5f1"
-            stroke-width="6"
+        <g class="graph-edge">
+          <line
+            x1="${source.x}"
+            y1="${source.y}"
+            x2="${target.x}"
+            y2="${target.y}"
+            marker-end="url(#arrow)"
           />
-          <text
-            x="${position.x}"
-            y="${position.y + 4}"
-            text-anchor="middle"
-            fill="${textColor}"
-            font-size="13"
-            font-weight="850"
-          >${escapeHtml(label)}</text>
+          ${
+            index < 10
+              ? `<text x="${labelX}" y="${labelY - 8}" text-anchor="middle">${escapeHtml(label)}</text>`
+              : ""
+          }
         </g>
       `;
     })
     .join("");
 
+  const circles = sortedNodes
+    .map((node) => {
+      const position = positions[node.id];
+      const color = getNodeColor(node.type);
+      const textColor = color === "#2f4a52" || color === "#5b74ff" ? "#ffffff" : "#2b2111";
+      const label = wrapSvgLabel(String(node.label || node.id || ""), 16);
+      const radius = getNodeRadius(node.type);
+
+      return `
+        <g class="graph-node graph-node-${escapeHtml(String(node.type || "Entity").toLowerCase())}">
+          <circle
+            cx="${position.x}"
+            cy="${position.y}"
+            r="${radius}"
+            fill="${color}"
+          />
+          <text x="${position.x}" y="${position.y - (label.length - 1) * 8}" text-anchor="middle" fill="${textColor}">
+            ${label
+              .map(
+                (line, lineIndex) =>
+                  `<tspan x="${position.x}" dy="${lineIndex === 0 ? 0 : 17}">${escapeHtml(line)}</tspan>`,
+              )
+              .join("")}
+          </text>
+          <text class="graph-node-type" x="${position.x}" y="${position.y + radius + 20}" text-anchor="middle">
+            ${escapeHtml(node.type || "Entity")}
+          </text>
+        </g>
+      `;
+    })
+    .join("");
+
+  const legend = buildGraphLegend(nodes);
+  const relationList = edges
+    .filter((edge) => positions[edge.source] && positions[edge.target])
+    .slice(0, 8)
+    .map((edge) => {
+      const source = nodes.find((node) => node.id === edge.source);
+      const target = nodes.find((node) => node.id === edge.target);
+      return `<li><b>${escapeHtml(source?.label || edge.source)}</b> ${escapeHtml(edge.label || "связано с")} <b>${escapeHtml(target?.label || edge.target)}</b></li>`;
+    })
+    .join("");
+
   graphStage.innerHTML = `
-    <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Граф связей">
-      ${lines}
-      ${circles}
-    </svg>
+    <div class="graph-visual">
+      <svg viewBox="0 0 ${width} ${height}" role="img" aria-label="Граф связей">
+        <defs>
+          <marker id="arrow" markerWidth="13" markerHeight="13" refX="12" refY="6.5" orient="auto">
+            <path d="M1,1 L12,6.5 L1,12 Z"></path>
+          </marker>
+        </defs>
+        ${lines}
+        ${circles}
+      </svg>
+    </div>
+    <div class="graph-side">
+      <div class="graph-legend">${legend}</div>
+      <div class="graph-relations">
+        <h3>Ключевые связи</h3>
+        <ul>${relationList || "<li>Связи не найдены.</li>"}</ul>
+      </div>
+    </div>
   `;
+}
+
+function sortGraphNodes(nodes, edges) {
+  const priority = {
+    Material: 0,
+    Experiment: 1,
+    Process: 2,
+    Property: 3,
+    Equipment: 4,
+    Paper: 5,
+    Publication: 5,
+    Team: 6,
+    Expert: 6,
+    Facility: 7,
+  };
+  const degree = {};
+  edges.forEach((edge) => {
+    degree[edge.source] = (degree[edge.source] || 0) + 1;
+    degree[edge.target] = (degree[edge.target] || 0) + 1;
+  });
+
+  return [...nodes].sort((a, b) => {
+    const typeA = priority[a.type] ?? 99;
+    const typeB = priority[b.type] ?? 99;
+    if (typeA !== typeB) return typeA - typeB;
+    return (degree[b.id] || 0) - (degree[a.id] || 0);
+  });
+}
+
+function wrapSvgLabel(value, limit) {
+  const words = value.split(/\s+/).filter(Boolean);
+  const lines = [];
+  let current = "";
+
+  words.forEach((word) => {
+    const next = current ? `${current} ${word}` : word;
+    if (next.length > limit && current) {
+      lines.push(current);
+      current = word;
+    } else {
+      current = next;
+    }
+  });
+
+  if (current) lines.push(current);
+  return (lines.length ? lines : [value]).slice(0, 3);
+}
+
+function getNodeRadius(type) {
+  const radii = {
+    Material: 70,
+    Experiment: 64,
+    Process: 58,
+    Property: 56,
+    Equipment: 52,
+    Paper: 50,
+    Publication: 50,
+    Team: 48,
+    Expert: 48,
+  };
+  return radii[type] || 52;
+}
+
+function buildGraphLegend(nodes) {
+  const types = [...new Set(nodes.map((node) => node.type || "Entity"))];
+  return types
+    .map(
+      (type) => `
+        <span class="legend-item">
+          <i style="background:${getNodeColor(type)}"></i>
+          ${escapeHtml(type)}
+        </span>
+      `,
+    )
+    .join("");
 }
 
 function getNodeColor(type) {
@@ -314,10 +434,13 @@ function getNodeColor(type) {
     Material: "#2f4a52",
     Process: "#5b74ff",
     Property: "#d9c7a3",
-    Experiment: "#d9d9d9",
+    Experiment: "#f0a85a",
     Paper: "#ffffff",
+    Publication: "#ffffff",
     Team: "#eee1c7",
+    Expert: "#eee1c7",
     Equipment: "#c9b993",
+    Facility: "#9fb7b9",
   };
   return colors[type] || "#d9d9d9";
 }
